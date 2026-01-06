@@ -1,0 +1,141 @@
+/* Tailwind Core */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/** Colors - https://tailwindcss.com/docs/colors **/
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #eab308;
+  --chart-4: #ef4444;
+  --chart-5: #a855f7;
+  --border: #f4f4f5;
+  --input: #e4e4e7;
+  --ring: #2563eb;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #09090b;
+  --card-foreground: #fafafa;
+  --popover: #09090b;
+  --popover-foreground: #fafafa;
+  --primary: #3b82f6;
+  --primary-foreground: #09090b;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #71717a;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #eab308;
+  --chart-4: #ef4444;
+  --chart-5: #a855f7;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #3b82f6;
+}
+
+/** Global Styles **/
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  *:focus-visible {
+    @apply outline-ring outline-2 outline-offset-2 outline rounded-sm;
+  }
+}
+
+/** Custom Scrollbar **/
+@layer base {
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--input);
+    border-radius: 5px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
+}
+
+/** Smooth scroll **/
+html {
+  scroll-behavior: smooth;
+}
+
+/** Custom Utilities **/
+@layer utilities {
+  .container {
+    @apply mx-auto max-w-full px-4 lg:px-5;
+  }
+
+  @media (min-width: 1280px) {
+    .container {
+      @apply max-w-[1280px];
+    }
+  }
+
+  .container-fluid {
+    @apply w-full mx-auto px-4 lg:px-5;
+  }
+
+  /* Marquee animations */
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap, 1rem)));
+    }
+  }
+
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap, 1rem)));
+    }
+  }
+
+  .animate-marquee {
+    animation: marquee var(--duration, 20s) infinite linear;
+  }
+
+  .animate-marquee-vertical {
+    animation: marquee-vertical var(--duration, 20s) linear infinite;
+  }
+}
+
+/* Metronic Configs */
+@import './config.metronic.css'; 
