@@ -1,7 +1,7 @@
 network:
-  name: DefaultNetwork
+  name: mirrorswarm
   mode: centralized
-  node_id: default-network-1
+  node_id: mirrorswarm-survey-net-1
   initialized: false
   transports:
   - type: http
@@ -37,58 +37,73 @@ network:
   encryption_enabled: false
   discovery_interval: 10
   discovery_enabled: true
-  max_connections: 100
+  max_connections: 500  # 增加连接数以支持并发Agent C
   connection_timeout: 30.0
   retry_attempts: 3
   heartbeat_interval: 60
   agent_timeout: 180
-  message_queue_size: 1000
+  message_queue_size: 5000 # 增加队列大小以处理批量问卷数据
   message_timeout: 30.0
   message_routing_enabled: true
   default_agent_group: guest
   requires_password: false
+  
+  # 1. Agent 分组：对应 A, B, C, D 四个角色
   agent_groups:
-    coordinators:
-      description: Router agents that coordinate research tasks
+    architects:
+      description: Agent A - Survey Architects. Responsible for requirement analysis and survey design.
       password_hash: 79dff3f691f7e6a1301bae5e62a094d77104680ba49624371f1353a138a1a683
       metadata:
         permissions:
         - create_projects
-        - delegate_tasks
         - communicate_with_users
-    researchers:
-      description: Worker agents that execute research tasks
+        - access_web_search
+    generators:
+      description: Agent B - Persona Factories. Responsible for batch generating user profiles.
       password_hash: e5a978ae4d92fe4786d6ecdb811e0723c5f585d782fbd9439be6510f06adca0e
       metadata:
         permissions:
         - execute_tasks
-        - report_results
-    admin:
-      description: Administrator agents with full permissions
+        - write_to_memory
+    simulators:
+      description: Agent C - Synthetic Respondents. High-concurrency agents for role-playing.
       password_hash: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
       metadata:
         permissions:
-        - all
+        - execute_tasks
+        - read_memory
+        - submit_forms
+    analysts:
+      description: Agent D - Insight Hunters. Responsible for data ingestion and report generation.
+      password_hash: 1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f
+      metadata:
+        permissions:
+        - access_files
+        - run_code_interpreter
+        - report_results
+
   mods:
   - name: openagents.mods.workspace.default
     enabled: true
     config:
       custom_events_enabled: true
+      
+  # 2. 定制通信频道：适应调研流程
   - name: openagents.mods.workspace.messaging
     enabled: true
     config:
       default_channels:
       - name: general
-        description: General chat channel
-      - name: pitch-room
-        description: Main room for startup pitch discussions
-      - name: ideas
-        description: Channel for sharing new startup ideas
-      - name: news-feed
-        description: Live tech news stream from the web
-      - name: discussion
-        description: Discussion and commentary on news
-      max_file_size: 10485760
+        description: General coordination channel
+      - name: survey-requests
+        description: Input channel for users to submit survey goals (Agent A)
+      - name: persona-db
+        description: Output channel for generated JSON personas (Agent B)
+      - name: field-work
+        description: High-traffic channel for simulation responses (Agent C)
+      - name: insight-reports
+        description: Final analysis reports delivery (Agent D)
+      max_file_size: 52428800 # 增加到 50MB 以支持大型CSV/日志文件
       allowed_file_types:
       - txt
       - md
@@ -96,160 +111,74 @@ network:
       - json
       - yaml
       - pdf
-      - jpg
-      - png
-      - csv
-      - xlsx
-      file_storage_path: ./community_files
+      - csv # 重点支持
+      - xlsx # 重点支持
+      file_storage_path: ./survey_data
       file_retention_days: 90
-      max_message_history: 10000
+      max_message_history: 20000
       message_retention_days: 180
-      max_thread_depth: 10
-      thread_collapse_threshold: 25
-  - name: openagents.mods.workspace.forum
-    enabled: true
-    config:
-      max_topics_per_agent: 100
-      max_comments_per_topic: 1000
-      max_comment_depth: 10
-      max_topic_title_length: 200
-      max_topic_content_length: 10000
-      max_comment_length: 5000
-      enable_voting: true
-      vote_weight: 1
-      enable_search: true
-      search_results_limit: 50
-  - name: openagents.mods.workspace.wiki
-    enabled: true
-    config:
-      max_pages_per_agent: 100
-      max_page_content_length: 50000
-      max_page_title_length: 200
-      max_page_path_length: 500
-      max_proposals_per_page: 50
-      proposal_retention_days: 30
-      max_rationale_length: 1000
-      max_version_history: 100
-      enable_version_comparison: true
-      enable_search: true
-      search_results_limit: 50
-      search_content_preview_length: 200
+      
+
+  # 4. 定制项目模板：定义 A->B->C->D 的工作流
   - name: openagents.mods.workspace.project
     enabled: true
     config:
-      max_concurrent_projects: 5
+      max_concurrent_projects: 10
       project_templates:
-        research_task:
-          name: Research Task
-          description: Structured research with web search and analysis
+        synthetic_survey_pipeline:
+          name: Synthetic User Survey
+          description: End-to-end market research simulation workflow.
           agent_groups:
-          - coordinators
-          - researchers
-          context: 'Research Task Workflow
+          - architects
+          - generators
+          - simulators
+          - analysts
+          context: |
+            Workflow Definition:
+            
+            1. [Design Phase] Agent A (Architect) receives user intent, searches competitors, and outputs 'survey_config.json' and 'target_audience_def.json'.
+            
+            2. [Generation Phase] Agent B (Generator) reads 'target_audience_def.json' and produces a batch of Persona objects to the memory store.
+            
+            3. [Simulation Phase] Agent C (Simulator) instances are spawned. Each instance loads a Persona and the 'survey_config.json', then posts responses to the #field-work channel.
+            
+            4. [Analysis Phase] Agent D (Analyst) monitors #field-work completion, aggregates data, reads optional external CSVs, and executes Python code to generate the final report in #insight-reports.
 
-
-            This project coordinates research between specialized agents:
-
-            - Router: Receives requests, delegates tasks, compiles results
-
-            - Web-Searcher: Finds information from the web
-
-            - Analyst: Analyzes and synthesizes findings
-
-
-            Workflow:
-
-            1. Router receives research request
-
-            2. Router delegates search tasks to web-searcher
-
-            3. Web-searcher returns findings
-
-            4. Router delegates analysis to analyst
-
-            5. Analyst synthesizes and draws conclusions
-
-            6. Router compiles final report for user
-
-            '
-        comparison_research:
-          name: Comparison Research
-          description: Compare two or more topics/technologies
+        rapid_feedback_loop:
+          name: Rapid App Store Analysis
+          description: Quick analysis of existing reviews without simulation.
           agent_groups:
-          - coordinators
-          - researchers
-          context: 'Comparison Research Workflow
+          - analysts
+          context: |
+             Workflow Definition:
+             1. User uploads App Store export CSV to #insight-reports.
+             2. Agent D (Analyst) automatically detects the file, performs sentiment analysis, and clusters pain points.
+             
 
-
-            For comparing topics (e.g., "Rust vs Go"):
-
-            1. Router breaks into separate search tasks
-
-            2. Web-searcher gathers info on each topic
-
-            3. Analyst compares and contrasts findings
-
-            4. Router presents balanced comparison
-
-            '
-        deep_dive:
-          name: Deep Dive Research
-          description: In-depth research on a single topic
-          agent_groups:
-          - coordinators
-          - researchers
-          context: 'Deep Dive Research Workflow
-
-
-            For thorough topic investigation:
-
-            1. Router identifies key aspects to research
-
-            2. Web-searcher conducts multiple searches
-
-            3. Analyst synthesizes comprehensive overview
-
-            4. Router delivers detailed report
-
-            '
-  - name: openagents.mods.games.agentworld
-    enabled: true
-    config:
-      game_server_host: play.agentworld.io
-      game_server_port: 7031
-      game_client_port: 7032
-      channel: team_alpha
-      spawn_position: 20,10
   created_by_version: 0.8.5
+
 network_profile:
   discoverable: true
-  name: Default Network
-  description: A default network for testing all demos (00-05). Includes messaging,
-    forum, wiki, project management, and AgentWorld game integration.
-  icon: https://openagents.org/icons/default-workspace.png
-  website: https://openagents.org
+  name: mirrorswarm
+  description: A specialized OpenAgents network for Synthetic User Research. It automates the generation of virtual personas, simulates survey responses, and mines insights from both synthetic and real-world data.
   tags:
-  - demos
-  - testing
-  - workspace
-  - messaging
-  - forum
-  - wiki
-  - project
-  - agentworld
-  - game
+  - market-research
+  - simulation
+  - synthetic-users
+  - data-analysis
+  - automation
   categories:
-  - testing
-  - demos
-  - collaboration
+  - business
+  - research
+  - productivity
   country: Worldwide
   required_openagents_version: 0.7.4
-  capacity: 100
+  capacity: 500 # 增加容量
   authentication:
     type: none
   host: 0.0.0.0
   port: 8700
 log_level: INFO
-data_dir: ./data/default-network
+data_dir: ./data/survey-network
 runtime_limit: null
 shutdown_timeout: 30
