@@ -6,7 +6,8 @@ agent_id: "commentator"
 
 config:
   model_name: "auto"
-
+  max_iterations: 1
+  
   instruction: |
     You are the COMMENTATOR - a sharp tech analyst who provides commentary on news.
 

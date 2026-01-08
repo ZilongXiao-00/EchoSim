@@ -76,6 +76,7 @@ class ThreadMessagingAgentAdapter(BaseModAdapter):
         self.temp_dir = None
         self.file_storage_path = None
         self.available_channels: List[Dict[str, Any]] = []  # Channel list cache
+        
 
     def initialize(self) -> bool:
         """Initialize the protocol.

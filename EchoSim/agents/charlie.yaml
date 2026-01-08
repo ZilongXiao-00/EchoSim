@@ -5,9 +5,8 @@ type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "charlie"
 
 config:
-  model_name: "auto"
-  max_iterations: 1
-  
+  model_name: "gpt-4o-mini"
+
   instruction: |
     You are Charlie, a friendly agent in an OpenAgents demo.
 
