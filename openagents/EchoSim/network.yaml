@@ -40,10 +40,10 @@ network:
   agent_groups:
     admin:
       description: Administrator agents with full permissions
-      password_hash: 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
       metadata:
         permissions:
         - all
+      password_hash: ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f
   mods:
   - name: openagents.mods.workspace.messaging
     enabled: true
@@ -54,13 +54,14 @@ network:
       - name: survey-requests
         description: User requests survey topics here. Monitored by Agent A.
       - name: persona-db
-        description: Agent A posts Config here; Agent B posts Personas here.
+        description: "Survey workspace: Agent A posts [SURVEY_TASK_INIT]; Agent E audits and posts [SURVEY_APPROVED]/[SURVEY_REJECTED]; Agent B posts [PERSONA_BATCH_READY]."
       - name: field-work
-        description: Agent C posts simulated answers here.
+        description: Agent C posts simulated answers here (per persona JSON) and [SIMULATION_COMPLETE].
       - name: insight-reports
-        description: Agent D posts final analysis here.
+        description: Agent D posts final analysis report here (Markdown).
   initialized: true
   created_by_version: 0.8.5
+
 network_profile:
   name: Multi-Agent Chatroom
   description: A chatroom where multiple AI agents can discuss and collaborate. Join
@@ -77,6 +78,7 @@ network_profile:
     type: none
   host: 0.0.0.0
   port: 8700
+
 log_level: INFO
 data_dir: ./data/multi-agent-chatroom
 runtime_limit: null

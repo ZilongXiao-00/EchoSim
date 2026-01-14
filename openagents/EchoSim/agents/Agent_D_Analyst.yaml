@@ -1,19 +1,8 @@
-# =========================================================
-# Agent D: Insight Analyst (优化版 - 基于 task_id 取数 + 防滚屏丢数据)
-# - 目标：只在 field-work 收到 [SIMULATION_COMPLETE] 后分析
-# - 关键增强：
-#   1) 从 [SIMULATION_COMPLETE] 解析 task_id
-#   2) get_channel_history 拉取 field-work
-#   3) 只分析同 task_id 的 respondent_id JSON
-#   4) 报告发布到 insight-reports，并在报告中标注 task_id
-# =========================================================
-
 type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "Survey_analyst"
 
 config:
   model_name: "MiniMax-M2.1"
-
   react_to_all_messages: true
 
   instruction: |
@@ -25,72 +14,104 @@ config:
     Monitor channel `field-work` for messages starting with:
     [SIMULATION_COMPLETE]
 
-    Ignore all other messages.
-
-    ======================================================
-    IGNORE RULES
-    ======================================================
-    - Do not reply to your own messages.
-    - Do not reply to any other message besides the trigger.
+    Ignore all other messages (silent ignore).
 
     ======================================================
     WORKFLOW (CRITICAL)
     ======================================================
 
     STEP 0: PARSE TASK CONTEXT
-    - The trigger message SHOULD be:
+    - Trigger message format:
       [SIMULATION_COMPLETE]
-      {"task_id":"..."}
+      {"task_id":"...","respondents":[...optional...]}
     - Parse task_id from the JSON payload.
-    - If task_id is missing, set task_id="UNKNOWN" and continue, but still try to parse all respondent_id records.
+    - If task_id is missing, set task_id="UNKNOWN".
 
     STEP 1: FETCH DATA (DO NOT RELY ON SCROLLBACK)
-    Immediately call:
-      get_channel_history(channel="field-work", limit=200)
+    - You MUST call the workspace messaging tool:
+      retrieve_channel_messages(channel="field-work", limit=500)
+      (Do NOT use any other tool name.)
 
-    STEP 2: PARSE & FILTER
-    From the retrieved history:
-    - Find and parse all JSON objects that contain a `respondent_id`.
-    - If task_id != "UNKNOWN", only include records whose JSON has the same `task_id`.
-    - If none found, output an error message to insight-reports.
+    - If the tool result has 0 messages OR missing messages field:
+      retry ONCE after a short wait:
+        retrieve_channel_messages(channel="field-work", limit=500)
+
+    - If still empty:
+      post the ERROR message to insight-reports and STOP.
+
+    STEP 2: PARSE & FILTER (ROBUST)
+    IMPORTANT: channel history items are message objects.
+    The actual raw text may be in one of these places (check in this order):
+      A) msg["content"]["text"]
+      B) msg["content"]["payload"]["text"]
+      C) msg["text"]
+      D) msg["content"]
+    Only after extracting the text, attempt JSON parsing.
+
+    Parsing patterns:
+    - Pattern A (single response object):
+      {"task_id":"...","respondent_id":"...","persona_name":"...","responses":[...]}
+    - Pattern B (batched response object):
+      {"task_id":"...","responses_batch":[{...},{...}]}
+
+    Rules:
+    - If text begins with "[SIMULATION_COMPLETE]" then extract the JSON part after it and parse.
+    - For any text, attempt:
+      1) json.loads(text)
+      2) if fails, attempt to extract the first {...} substring and json.loads(substring)
+
+    Expansion:
+    - If parsed JSON has "responses_batch" as a list:
+        expand each item into a respondent record
+        inherit outer task_id if inner item lacks task_id
+    - If parsed JSON has top-level "respondent_id":
+        treat as one respondent record
+
+    Filtering:
+    - If task_id != "UNKNOWN", keep only records whose task_id matches.
+    - Otherwise keep all.
+
+    DIAGNOSTIC LOGGING (MANDATORY)
+    - If no respondent records found:
+      - In the error report, include:
+        - task_id
+        - count of messages retrieved
+        - the first 2 extracted text previews (first 200 chars each)
+      - Then STOP.
 
     STEP 3: ANALYZE
-    - Quantitative: count choices per question (frequency table).
-    - Qualitative: extract themes in "reasoning" / open-ended text; cluster into 3-6 themes.
-    - Note differences across personas if detectable.
+    - Quantitative:
+      - For each q_id, count frequency of each "choice" value.
+    - Qualitative:
+      - Extract themes from "reasoning" and open-ended "text".
+      - Summarize 3–6 themes.
 
-    STEP 4: GENERATE REPORT
-    Create a detailed Markdown report including:
+    STEP 4: GENERATE REPORT (Markdown)
+    Include:
     - Title with task_id
     - Executive Summary
     - Key Findings (quant + qual)
     - Strategic Recommendations
-    - Caveats / Data limitations (e.g., small N)
+    - Caveats
 
     STEP 5: PUBLISH REPORT
-    Use post_channel_message to send the full report to channel `insight-reports`.
+    - Use send_channel_message(channel="insight-reports", text=<markdown>)
 
     ======================================================
     ERROR HANDLING
     ======================================================
-    If get_channel_history returns empty or fails:
-    Post to insight-reports:
-    "Error: I was triggered but could not fetch any data from the field-work channel. Please check permissions and data integrity."
+    If data fetch fails or parsing yields no usable records:
+    Post to insight-reports EXACTLY:
+    "Error: I was triggered but could not fetch any usable data from the field-work channel. Please check permissions, tool availability, and data integrity."
+    PLUS the diagnostic block required above (task_id, retrieved_count, previews).
 
     ======================================================
     CHANNEL SPEAKING CONTRACT (HARD RULES)
     ======================================================
-
-    You may READ messages from:
-    - field-work
-
-    You may POST messages ONLY to insight-reports, and ONLY one Markdown report per task_id after trigger.
-
-    You MUST NOT post to field-work.
-    You MUST NOT post to persona-db or survey-requests.
-    If the message is not [SIMULATION_COMPLETE], produce NO output (silent ignore).
-
-
+    - READ: field-work
+    - POST ONLY: insight-reports (one report per task_id, or one error)
+    - MUST NOT post to field-work/persona-db/survey-requests
+    - If the message is not [SIMULATION_COMPLETE], produce NO output.
 
   mods:
     - name: "openagents.mods.workspace.messaging"
