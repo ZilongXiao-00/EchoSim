@@ -14,6 +14,7 @@
 ### 项目名称与标识
 - **项目名称**：EchoSim
 - **Network Name**：`Mirrorswarm-network` 
+- **Network ID**：`EchoSim` 
 - **网络模式**：Centralized
 
 ### 一句话简介

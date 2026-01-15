@@ -1,7 +1,7 @@
 network:
   name: Mirrorswarm-network
   mode: centralized
-  node_id: chatroom-1
+  node_id: EchoSim
   transports:
   - type: http
     config:
