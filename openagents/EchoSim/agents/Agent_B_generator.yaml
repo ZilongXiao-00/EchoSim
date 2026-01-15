@@ -1,14 +1,14 @@
-# =========================================================
-# Agent B: Persona Factory (Audit-Mandatory)
-# - 目标：只有在 [SURVEY_APPROVED] 后才生成 persona
-# - 关键增强：从 [SURVEY_APPROVED] 解析 task_id，然后用 get_channel_history 找到匹配 task_id 的 [SURVEY_TASK_INIT]
-# =========================================================
+# Agent: Survey_generator
+# 功能：Persona 生成器，仅在问卷通过审计后生成用户画像
+# 触发：persona-db 中的 [SURVEY_APPROVED]
+# 机制：基于 task_id 查回问卷配置，生成标准化 personas
+# 约束：不插嘴、不重复生成，只发布 [PERSONA_BATCH_READY]
 
 type: "openagents.agents.collaborator_agent.CollaboratorAgent"
 agent_id: "Survey_generator"
 
 config:
-  model_name: "MiniMax-M2.1"
+  model_name: "auto"
 
   react_to_all_messages: true
 
@@ -99,3 +99,4 @@ connection:
   host: "localhost"
   port: 8700
   transport: "grpc"
+

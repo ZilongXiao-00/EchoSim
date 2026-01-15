@@ -13,7 +13,7 @@
 
 ### 项目名称与标识
 - **项目名称**：EchoSim
-- **Network ID**：`MultiAgentChatroom` (chatroom-1)
+- **Network Name**：`Mirrorswarm-network` 
 - **网络模式**：Centralized
 
 ### 一句话简介
@@ -189,10 +189,11 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
    - 基于情报设计问卷，包含：价格敏感度、使用场景、顾虑因素等维度
    - 发布到 `#persona-db`
 
-3. **质量审核循环**  
-   Agent E 审核：
-   - ✅ 通过 → 进入下一阶段
-   - ❌ 拒绝 → Agent A 修订（最多 2 次）
+3. **质量审核循环（Agent E Gatekeeper）**  
+   Agent E 作为“方法论审计员”，对 Agent A 输出的问卷进行质量把关，只允许合格问卷进入下游链路。
+
+   - ✅ 通过 → 产出 `[SURVEY_APPROVED]`，触发 Agent B 生成用户画像
+   - ❌ 拒绝 → 产出 `[SURVEY_REJECTED]` + 可执行修改建议，触发 Agent A 按同一 `task_id` 修订（`revision+1`，最多 2 次）
 
 4. **画像生成**  
    Agent B 解析目标受众（如：25-35岁科技爱好者），批量生成详细画像：
@@ -241,14 +242,16 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
   - Hacker News：技术社区质疑与期待
 - 问卷设计基于**真实市场反馈**而非主观假设
 
-#### 3. **工业级并发模拟引擎**
-- 传统方案：逐个调用 LLM（N 个画像耗时 N × T）
+#### 3. **可扩展并发模拟引擎**
+- 传统方案：逐个调用 LLM（样本数 N 增大时，总耗时近似线性增长）
 - EchoSim 方案：
-  - 使用 `asyncio` + `httpx` 异步并发调用
-  - 支持 Semaphore 控制最大并发数（避免 429 限流）
-  - 自动重试 + 指数退避策略
-  - 实时监控并发峰值（`_MAX_ACTIVE_TASKS`）
-- **性能提升**：100 个画像仅需 ~30 秒（max_concurrency=8）
+  - 使用 `asyncio` + `httpx.AsyncClient` 实现批量异步并发调用（`create_task` + `gather`）
+  - 通过 `asyncio.Semaphore` 限制最大并发（`max_concurrency`），降低触发限流（429）的概率
+  - 内置自动重试：遇到 429 优先遵循 `Retry-After`，否则采用退避等待 + 抖动（jitter）
+  - 并发观测与诊断：记录 `_MAX_ACTIVE_TASKS`，并在返回中输出 `concurrency_report`（configured / observed）
+  - 兼容运行环境：当宿主环境已有 event loop 时，使用线程 + 新 event loop 执行，避免 asyncio 冲突
+- **性能收益**：在并发度为 `k` 时，整体耗时可从串行的 O(N) 缩短到接近 O(N/k) 的量级（受模型延迟与限流影响）
+
 
 #### 4. **任务版本追踪系统**
 - 每个调研任务分配唯一 `task_id`（如：`survey_20260115_102030`）
@@ -336,11 +339,13 @@ git clone https://github.com/ZilongXiao-00/EchoSim.git
 cd EchoSim
 ```
 
-#### 2️⃣ 安装 OpenAgents
+#### 2️⃣ 安装 OpenAgents和相关依赖
 
 **选项 A：通过 pip 安装（推荐）**
 ```bash
 pip install openagents>=0.8.5
+pip install chromadb
+pip install -U sentence_transformers
 ```
 
 **选项 B：从源码安装（开发者模式）**
@@ -542,7 +547,7 @@ export DEFAULT_LLM_MODEL_NAME="claude-3-opus-20240229"
 - 检查 `network.yaml` 中 `serve_studio: true`
 - 尝试使用 `http://127.0.0.1:8700/studio`
 
----
+--- 
 
 ## 📁 项目结构
 
@@ -593,51 +598,76 @@ EchoSim/
 
 2. 多 Agent 协作工作流搭建：
 
--架构设计：主导设计了 A/B/C/D 四个智能体的分工协议，建立了基于 Workspace Messaging Mod 的四频道隔离通信机制。
+- 架构设计：主导设计了 A/B/C/D 四个智能体的分工协议，建立了基于 Workspace Messaging Mod 的四频道隔离通信机制。
+- 🤖Agent A (Architect)：设计了基于实时情报（market_scanner）的动态问卷生成逻辑，确保调研维度的时效性。
 
--🤖Agent A (Architect)：设计了基于实时情报（market_scanner）的动态问卷生成逻辑，确保调研维度的时效性。
+- 🎨Agent B (Factory)：构建了高保真用户画像生成引擎，实现从人口统计学到心理动机的深度刻画。
 
--🎨Agent B (Factory)：构建了高保真用户画像生成引擎，实现从人口统计学到心理动机的深度刻画。
+- 🚀Agent C (Simulator)：主导开发了基于异步 IO 的 sim_worker_pool，实现了工业级的 LLM 并发填答能力。
 
--🚀Agent C (Simulator)：主导开发了基于异步 IO 的 sim_worker_pool，实现了工业级的 LLM 并发填答能力。
-
--📊Agent D (Analyst)：定义了定性与定量结合的报告生成模板，确保输出洞察的可落地性。
+- 📊Agent D (Analyst)：定义了定性与定量结合的报告生成模板，确保输出洞察的可落地性。
 
 3. 技术路线与升级方案：规划了项目的演进蓝图，包括纵向的专业调研方法论集成（如 MaxDiff、Conjoint）以及横向的多源数据接入。
+
+#### Yecheng@u.nus.edu / Scofieldj213@gmail.com
+
+**个人介绍**：  
+新加坡国立大学（NUS）机械工程博士研究生，研究方向聚焦于**多加工机器人协作**与**能耗预测与优化**。同时关注多智能体协作（Multi-Agent Systems）在复杂工程系统中的应用，致力于将智能算法与真实制造场景深度融合。
+
+**项目贡献**：
+
+1. 项目体系完善与流程强化：  
+   在原有 ABCD Agents 基础上，引入 **Agent E（Survey Auditor）** 审计角色，构建“审核驱动型”工作流，对问卷设计阶段进行方法论与质量把关，形成 **设计—审核—修订—放行** 的标准化闭环，有效避免低质量问卷进入下游模拟环节。
+
+2. 多 Agent 协作工作流升级：
+
+- 架构优化：在原有 A/B/C/D 协作模型上扩展为 **A/B/C/D/E 五智能体体系**，解决多 Agent 在非职责频道“插嘴”的稳定性问题。  
+
+- 🤖 Agent A (Architect)：保留基于实时情报（market_scanner）的动态问卷生成逻辑，并与 Agent E 的审核流程深度耦合，形成可追溯的问卷版本管理机制。  
+
+- 🛡️ Agent E (Auditor)：新增设计并落地问卷审核与防死锁控制策略，支持“最多两次修订 + 强制放行”机制，在保证质量的同时避免流程阻塞。    
+
+- 🚀 Agent C (Simulator)：对原有串行模拟流程进行工程级重构，开发并集成 `sim_worker_pool` 工具，基于 `asyncio + httpx` 实现 **受控并发模拟引擎**，支持：
+  - 并发上限控制（Semaphore）
+  - 自动重试与指数退避
+  - 并发峰值监控  
+  - 显著提升大规模画像场景下的执行效率与系统吞吐能力，将 EchoSim 升级为**可扩展、可维护的多智能体系统**。
+  
+3. 技术路线与升级方案：  
+   在原有演进蓝图基础上，补充了**审核驱动流程设计**与**工业级并发模拟能力**两条核心技术主线。
+---
 
 ## 🚀 遇到的挑战与解决方案
 
 #### 1. Agent 插嘴
--**问题阐述**：
 
-遇到了Agent在非default_channels其他频道插嘴监控的问题
+- **问题阐述**：  
+早期多 Agent 在 `react_to_all_messages: true` 的条件下，可能对非职责频道消息产生响应（跨频道“串话”），引发误触发、重复输出与流程污染。
 
--**解决方案**：
-1. 
+- **解决方案**：  
+通过“协议前缀 + 频道护栏 + 幂等去重”三层治理，系统性消除插嘴：
 
+  1) **协议前缀触发**：所有关键阶段仅响应指定前缀（如 `[SURVEY_TASK_INIT]` / `[PERSONA_BATCH_READY]` / `[SIMULATION_COMPLETE]`），其余消息静默忽略。  
+  2) **Channel Guard**：在每个 Agent 指令中加入硬性频道校验，只允许从指定频道触发；非目标频道事件一律 `silent ignore`。  
+  3) **Idempotency 去重**：对关键输出（如 Agent D 报告）引入 `task_id` 级去重检查，确保同一任务最多输出一次，避免网络重放或重复事件导致二次发言。
 
 #### 2. 尝试联网搜索时遇到了安全机制问题
--**问题阐述**：
-
+- **问题阐述**：
 在尝试联网搜索时遇到了安全机制问题： Agent 确实听懂了指令，并且试图调用搜索工具紧接着工具调用，Agent A 发送了一条消息：
-
 "I apologize, but I don't have access to live web search capabilities..."
-
 当它生成工具调用的代码后，它的“自我认知”部分立刻跳出来反驳自己，生成了道歉信，导致整个流程被中断（调用了Tool: finish）。它没有等待搜索结果回来，就自己把对话结束了。
 
--**解决方案**：
-
+- **解决方案**：
 尝试了修改提示词，发现不稳定后，采用了让Agent调用python工具‘market_scanner’，通过三个不同的渠道（Google News、Reddit 和 Hacker News）抓取特定话题的最新动态，并将结果整合为标准化的数据格式。
 
 #### 3. 生成用户画像速度慢
 
--**问题阐述**：
+- **问题阐述**：  
+Agent C 早期采用串行逐个 persona 调用 LLM，样本数增大后总耗时线性增长，难以满足实际调研场景的规模需求。
 
-串行执行
-
--**解决方案**：
-
-引入了xx工具，将工作流程改为了并行执行。
+- **解决方案**：  
+引入 `sim_worker_pool` 并封装为自定义工具 `simulate_survey_batch`，将 persona 填答改为**批量并行模拟**，通过 `max_concurrency` 控制并发上限以兼顾吞吐与限流稳定性。  
+效果：在相同模型与问题规模下，整体耗时显著下降，使得 50/100+ personas 的模拟具备实际可用性。
 
 ## 🤝 贡献
 

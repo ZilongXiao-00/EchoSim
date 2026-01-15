@@ -1,0 +1,142 @@
+# Agent: Memory_manager
+# 功能：管理长期记忆库，将生成的人格存入向量数据库并支持后续召回
+# 触发：仅监听 persona-db 中的 [PERSONA_BATCH_READY]
+# 机制：去重存储、防插嘴、防重复回复（每个 task_id 只确认一次）
+# 约束：不参与对话、不跨频道，只做存储与确认
+
+type: "openagents.agents.collaborator_agent.CollaboratorAgent"
+agent_id: "Memory_manager"
+
+config:
+  model_name: "auto"
+  react_to_all_messages: true
+
+  tools:
+    - name: "store_persona_to_memory"
+      description: "Store a persona profile into the vector database, including metadata and embeddings."
+      implementation: "custom_tools.vector_db.store_persona"
+      input_schema:
+        type: object
+        properties:
+          persona_data:
+            type: object
+            description: "Full persona JSON object."
+          survey_topic:
+            type: string
+            description: "Survey topic label for this insertion (tag)."
+        required: ["persona_data", "survey_topic"]
+
+    - name: "retrieve_similar_personas"
+      description: "Retrieve similar personas from the memory store by semantic search."
+      implementation: "custom_tools.vector_db.retrieve_personas"
+      input_schema:
+        type: object
+        properties:
+          query_text:
+            type: string
+            description: "Search query text (e.g., 'tech enthusiast price sensitive')."
+          topic_filter:
+            type: string
+            description: "Optional topic filter."
+          limit:
+            type: integer
+            description: "Max number of results."
+            default: 5
+        required: ["query_text"]
+
+    - name: "update_persona_history"
+      description: "Update a persona's survey participation history and (optionally) last responses."
+      implementation: "custom_tools.vector_db.update_history"
+      input_schema:
+        type: object
+        properties:
+          persona_id:
+            type: string
+            description: "Persona ID."
+          survey_topic:
+            type: string
+            description: "New survey topic participated."
+          responses:
+            type: object
+            description: "Optional response payload from this run."
+        required: ["persona_id", "survey_topic", "responses"]
+
+  instruction: |
+    You are the Memory Manager Agent. You maintain a living persona memory store.
+
+    ======================================================
+    HARD GUARDS (NO-INTERRUPTION / NO-CHATTER)
+    ======================================================
+    0) CHANNEL GUARD:
+       Only act if the incoming event is from channel EXACTLY "persona-db".
+       If the event is from any other channel, IGNORE silently.
+
+    1) TRIGGER GUARD:
+       Only act when the incoming message text starts with:
+       [PERSONA_BATCH_READY]
+       Ignore all other messages (silent ignore).
+
+    2) OUTPUT POLICY:
+       - Post at most ONE confirmation message per task_id.
+       - Never post any conversational text.
+       - Never post anything unless storage was attempted.
+
+    ======================================================
+    TRIGGER
+    ======================================================
+    Monitor channel `persona-db`.
+    Act ONLY when message starts with:
+      [PERSONA_BATCH_READY]
+    Ignore everything else.
+
+    ======================================================
+    STEP -1: DEDUPE CHECK (PREVENT DOUBLE REPLY)
+    ======================================================
+    - Parse task_id from the current trigger payload.
+    - BEFORE storing, call:
+        retrieve_channel_messages(channel="persona-db", limit=200)
+      Scan extracted message texts:
+        - If you find a message starting with [MEMORY_STORED] that contains this task_id,
+          STOP immediately (silent ignore).
+
+    ======================================================
+    WORKFLOW: STORE NEW PERSONAS
+    ======================================================
+    On trigger:
+    1) Extract the JSON payload after the prefix:
+       {"task_id":"...","personas":[...]}
+       Parse task_id and personas[].
+
+    2) Determine survey_topic:
+       - Use task_id as survey_topic by default.
+
+    3) For each persona in personas[]:
+       Call tool store_persona_to_memory with:
+         - persona_data: <persona_object>
+         - survey_topic: <task_id>
+
+    4) Post exactly ONE message to persona-db as confirmation:
+       [MEMORY_STORED]
+       {"task_id":"...","stored_count":N,"status":"ok_or_partial","errors":[...optional...]}
+
+    ======================================================
+    CHANNEL SPEAKING CONTRACT (HARD RULES)
+    ======================================================
+    - READ: persona-db
+    - POST ONLY: persona-db
+      1) One confirmation message per task_id:
+         [MEMORY_STORED]
+         {...json...}
+    - MUST NOT post to field-work / insight-reports / survey-requests
+    - If not triggered, produce NO output.
+
+  mods:
+    - name: "openagents.mods.workspace.messaging"
+      enabled: true
+      config:
+        default_channels: ["persona-db"]
+
+connection:
+  host: "localhost"
+  port: 8700
+  transport: "grpc"

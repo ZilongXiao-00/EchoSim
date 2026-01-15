@@ -1,5 +1,5 @@
 network:
-  name: MultiAgentChatroom
+  name: Mirrorswarm-network
   mode: centralized
   node_id: chatroom-1
   transports:
@@ -20,7 +20,7 @@ network:
     config:
       port: null
       agent:
-        name: MultiAgentChatroom
+        name: Mirrorswarm-network
         description: Multi-agent chatroom with A2A support
   manifest_transport: http
   recommended_transport: grpc
@@ -44,34 +44,48 @@ network:
         permissions:
         - all
       password_hash: ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f
-  mods:
-  - name: openagents.mods.workspace.messaging
-    enabled: true
-    config:
-      default_channels:
-      - name: general
-        description: General chat
-      - name: survey-requests
-        description: User requests survey topics here. Monitored by Agent A.
-      - name: persona-db
-        description: "Survey workspace: Agent A posts [SURVEY_TASK_INIT]; Agent E audits and posts [SURVEY_APPROVED]/[SURVEY_REJECTED]; Agent B posts [PERSONA_BATCH_READY]."
-      - name: field-work
-        description: Agent C posts simulated answers here (per persona JSON) and [SIMULATION_COMPLETE].
-      - name: insight-reports
-        description: Agent D posts final analysis report here (Markdown).
+  mods: 
+    - name: openagents.mods.workspace.messaging 
+      enabled: true
+      config:
+        default_channels:
+          - name: general
+            description: General chat
+          - name: survey-requests
+            description: User requests survey topics here. Monitored by Agent A.
+          - name: persona-db
+            description: "Survey workspace: Agent A posts [SURVEY_TASK_INIT]; Agent E audits and posts [SURVEY_APPROVED]/[SURVEY_REJECTED]; Agent B posts [PERSONA_BATCH_READY];Agent F listens here to store personas into long-term memory."
+          - name: field-work
+            description: Agent C posts simulated answers here (per persona JSON) and [SIMULATION_COMPLETE].
+          - name: insight-reports
+            description: Agent D posts final analysis report here (Markdown).
+  
   initialized: true
   created_by_version: 0.8.5
 
 network_profile:
-  name: Multi-Agent Chatroom
-  description: A chatroom where multiple AI agents can discuss and collaborate. Join
-    the conversation!
+  name: Mirrorswarm network
+  description: >
+    Mirrorswarm is a multi-agent simulation network designed for end-to-end synthetic
+    user research workflows. The system orchestrates a full pipeline including:
+    survey task initialization, audit and approval, persona generation, parallel
+    response simulation, long-term persona memory management, and automated insight
+    analysis. Each agent operates under strict trigger-based contracts to prevent
+    cross-talk, ensuring deterministic, reproducible, and scalable research
+    simulations.
   tags:
-  - chat
-  - collaboration
-  - discussion
+    - simulation
+    - multi-agent
+    - survey
+    - persona
+    - memory
+    - analytics
+
   categories:
-  - collaboration
+    - collaboration
+    - research
+    - automation
+
   country: Worldwide
   capacity: 20
   authentication:
@@ -80,6 +94,6 @@ network_profile:
   port: 8700
 
 log_level: INFO
-data_dir: ./data/multi-agent-chatroom
+data_dir: ./data/mirrorswarm-network
 runtime_limit: null
 shutdown_timeout: 30
