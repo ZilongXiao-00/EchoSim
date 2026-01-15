@@ -583,41 +583,60 @@ EchoSim/
 ---
 ## 🤝 团队与分工
 #### ZilongXiao-00@xiaozl_00@foxmail.com
+
 **个人介绍**：
 测试开发工程师，AI 爱好者。擅长挖掘前沿技术落地场景，专注于多智能体协作（Multi-Agent Systems）与自动化流程重构。
+
 **项目贡献**：
+
 1. 项目发起与构思：独立提出 EchoSim 项目概念，通过 AI 合成样本解决传统调研“慢、贵、难”的痛点，定义了“模拟受访者”与“实时市场情报驱动”的核心产品逻辑。
+
 2. 多 Agent 协作工作流搭建：
 
 架构设计：主导设计了 A/B/C/D 四个智能体的分工协议，建立了基于 Workspace Messaging Mod 的四频道隔离通信机制。
 
 Agent A (Architect)：设计了基于实时情报（market_scanner）的动态问卷生成逻辑，确保调研维度的时效性。
+
 Agent B (Factory)：构建了高保真用户画像生成引擎，实现从人口统计学到心理动机的深度刻画。
+
 Agent C (Simulator)：主导开发了基于异步 IO 的 sim_worker_pool，实现了工业级的 LLM 并发填答能力。
+
 Agent D (Analyst)：定义了定性与定量结合的报告生成模板，确保输出洞察的可落地性。
+
 3. 技术路线与升级方案：规划了项目的演进蓝图，包括纵向的专业调研方法论集成（如 MaxDiff、Conjoint）以及横向的多源数据接入。
 
 ## 🚀 遇到的挑战与解决方案
 
 #### 1. Agent 插嘴
 **问题阐述**：
+
 遇到了Agent在非default_channels其他频道插嘴监控的问题
+
 **解决方案**：
 1. 
 
 
 #### 2. 尝试联网搜索时遇到了安全机制问题
 **问题阐述**：
+
 在尝试联网搜索时遇到了安全机制问题： Agent 确实听懂了指令，并且试图调用搜索工具紧接着工具调用，Agent A 发送了一条消息：
+
 "I apologize, but I don't have access to live web search capabilities..."
+
 当它生成工具调用的代码后，它的“自我认知”部分立刻跳出来反驳自己，生成了道歉信，导致整个流程被中断（调用了Tool: finish）。它没有等待搜索结果回来，就自己把对话结束了。
+
 **解决方案**：
+
 尝试了修改提示词，发现不稳定后，采用了让Agent调用python工具‘market_scanner’，通过三个不同的渠道（Google News、Reddit 和 Hacker News）抓取特定话题的最新动态，并将结果整合为标准化的数据格式。
 
 #### 3. 生成用户画像速度慢
+
 **问题阐述**：
+
 串行执行
+
 **解决方案**：
+
 引入了xx工具，将工作流程改为了并行执行。
 
 ## 🤝 贡献
