@@ -51,54 +51,61 @@ EchoSim 是一个基于 OpenAgents 驱动的**自动化市场调研框架**，�
 **架构模式**：**审核驱动的流水线 + 星型协作**
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     EchoSim 工作流                           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                          EchoSim 工作流                              │
+└─────────────────────────────────────────────────────────────────────┘
 
-  用户输入              ┌──────────────┐
-(调研主题) ──────────> │   Agent A    │  调研架构师
-                       │Survey Architect│ (市场情报扫描)
-                       └───────┬────────┘
-                               │ [SURVEY_TASK_INIT]
-                               ▼
-                       ┌──────────────┐
-                       │   Agent E    │  问卷审核员
-                       │Survey Auditor│ (质量把关)
-                       └───┬──────┬───┘
-                           │      │
-        [REJECTED] ◄───────┘      └────────> [APPROVED]
-              │                               │
-              └───────> 修订循环 (最多2次)    │
-                                              ▼
-                                     ┌──────────────┐
-                                     │   Agent B    │  画像生成工厂
-                                     │Persona Factory│
-                                     └───────┬──────┘
-                                             │ [PERSONA_BATCH_READY]
-                                             ▼
-                                     ┌──────────────┐
-                                     │   Agent C    │  虚拟受访者
-                                     │Synthetic Resp│ (并发模拟池)
-                                     └───────┬──────┘
-                                             │ [SIMULATION_COMPLETE]
-                                             ▼
-                                     ┌──────────────┐
-                                     │   Agent D    │  洞察分析师
-                                     │Insight Hunter│
-                                     └───────┬──────┘
-                                             │
-                                             ▼
-                                        最终报告
+   用户输入                ┌──────────────┐
+ (调研主题) ────────────> │   Agent A    │  调研架构师
+                          │Survey Architect│ (市场情报扫描)
+                          └───────┬────────┘
+                                  │ [SURVEY_TASK_INIT]
+                                  ▼
+                          ┌──────────────┐
+                          │   Agent E    │  问卷审核员
+                          │Survey Auditor│ (质量把关)
+                          └───┬──────┬───┘
+                               │      │
+           [REJECTED] ◄────────┘      └─────────> [APPROVED]
+                 │                                 │
+                 └────────> 修订循环 (最多2次)     │
+                                                   ▼
+                                          ┌──────────────┐
+                                          │   Agent B    │  画像生成工厂
+                                          │Persona Factory│
+                                          └───────┬──────┘
+                                                  │ [PERSONA_BATCH_READY]
+                                                  ▼
+                                          ┌──────────────┐
+                                          │   Agent F    │  记忆管理器
+                                          │Memory Manager│ (向量数据库)
+                                          └───────┬──────┘
+                                                  │ [MEMORY_STORED]
+                                                  ▼
+                                          ┌──────────────┐
+                                          │   Agent C    │  虚拟受访者
+                                          │Synthetic Resp│ (并发模拟池)
+                                          └───────┬──────┘
+                                                  │ [SIMULATION_COMPLETE]
+                                                  ▼
+                                          ┌──────────────┐
+                                          │   Agent D    │  洞察分析师
+                                          │Insight Hunter│
+                                          └───────┬──────┘
+                                                  │
+                                                  ▼
+                                             最终报告
 ```
 
 ### 核心特性
 - 🔒 **质量保证机制**：Agent E 审核驱动，防止低质量问卷流入下游
 - 🔄 **防死锁设计**：最多 2 次修订限制，强制通过机制
+- 🧠 **动态记忆存储**：Agent F 将生成的用户画像持久化到向量数据库，支持后续召回与复用
 - 🌐 **实时情报采集**：market_scanner 工具抓取 Google News、Reddit、Hacker News
 - ⚡ **高并发模拟引擎**：sim_worker_pool 支持异步批量调用，实时监控并发峰值
 - 📡 **频道化通信**：基于 Workspace Messaging Mod 的 4 频道隔离
 - 🔖 **任务追踪系统**：task_id + revision 版本管理，端到端可追溯
-- 🎨 **结构化协议**：[SURVEY_TASK_INIT]、[SURVEY_APPROVED] 等协议消息规范
+- 🎨 **结构化协议**：[SURVEY_TASK_INIT]、[SURVEY_APPROVED]、[PERSONA_BATCH_READY]、[MEMORY_STORED] 等协议消息规范
 
 ---
 
@@ -111,6 +118,7 @@ EchoSim 是一个基于 OpenAgents 驱动的**自动化市场调研框架**，�
 | **Agent A** | 调研架构师<br>(Survey Architect) | • 理解调研需求<br>• 扫描市场情报<br>• 设计问卷结构 | market_scanner | survey-requests | persona-db |
 | **Agent E** | 问卷审核员<br>(Survey Auditor) | • 质量把关<br>• 方法论审核<br>• 防死锁控制 | - | persona-db | persona-db |
 | **Agent B** | 画像生成工厂<br>(Persona Factory) | • 解析目标受众<br>• 批量生成用户画像<br>• 注入背景与偏好 | - | persona-db | persona-db |
+| **Agent F** | 记忆管理器<br/>(Memory Manager) | • 将画像存入向量库<br/>• 确认存储状态 <br/>• 监听 persona-db<br/> | store_persona_to_memory<br/>retrieve_similar_personas<br/>update_persona_history | persona-db | persona-db |
 | **Agent C** | 虚拟受访者<br>(Synthetic Respondent) | • 加载画像角色扮演<br>• 高保真模拟填答<br>• 并发批量执行 | sim_worker_pool | persona-db | field-work |
 | **Agent D** | 洞察分析师<br>(Insight Hunter) | • 收集模拟数据<br>• 定量+定性分析<br>• 生成 Markdown 报告 | - | field-work | insight-reports |
 
@@ -122,7 +130,7 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
 | 频道名称 | 用途 | 参与者 |
 |---------|------|-------|
 | **#survey-requests** | 用户发布调研主题 | User → Agent A |
-| **#persona-db** | 问卷设计、审核、画像传递 | Agent A ⇄ Agent E → Agent B |
+| **#persona-db** | 问卷设计、审核、画像传递 | Agent A ⇄ Agent E → Agent B→ Agent F |
 | **#field-work** | 模拟填答数据汇总 | Agent C → Agent D |
 | **#insight-reports** | 最终分析报告发布 | Agent D → User |
 
@@ -143,6 +151,10 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
 // Agent E 审核通过
 [SURVEY_APPROVED]
 {"task_id": "survey_20260115_102030", "revision": 0}
+
+// Agent F 存储确认
+[MEMORY_STORED]
+{"task_id": "survey_20260115_102030", "stored_count": 2, "status": "ok"}
 
 // Agent C 完成模拟
 [SIMULATION_COMPLETE]
@@ -165,6 +177,9 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
 自研工具无缝集成到 Agent 配置：
 - `market_scanner.get_market_intel(query)` - 市场情报扫描
 - `sim_worker_pool.simulate_survey_batch(...)` - 并发模拟引擎
+- `vector_db.store_persona(...)` - 用户画像向量存储
+- `vector_db.retrieve_personas(...)` - 相似画像召回
+- `vector_db.update_history(...)` - 参与历史更新
 
 ✅ **CollaboratorAgent 类型**  
 所有 Agent 基于 `openagents.agents.collaborator_agent.CollaboratorAgent`，支持：
@@ -208,26 +223,39 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
    }
    ```
 
-5. **高保真模拟填答**  
+5. **记忆存储（Agent F 动态记忆库）**  
+   Agent F 监听 `[PERSONA_BATCH_READY]`，对每个人物画像调用 `store_persona_to_memory`，将其存入向量数据库 `openagents/local_vector_db/persona_db/chroma.sqlite3`，并发布 `[MEMORY_STORED]` 确认存储状态。
+
+6. **高保真模拟填答**  
    Agent C 调用 `sim_worker_pool`：
+
    - 并发模拟 N 个画像（如 N=100）
    - 每个画像严格从其背景出发回答问题
    - 监控并发峰值（如：配置 max_concurrency=8）
 
-6. **洞察分析**  
+7. **洞察分析**  
    Agent D 自动分析：
    - **定量**：选择题频次统计、价格区间偏好
    - **定性**：提取主题（"担心折痕影响寿命"、"期待大屏办公"）
    - 生成 Markdown 报告发布到 `#insight-reports`
 
-7. **结果交付**  
+8. **结果交付**  
    产品经理在 Studio UI 查看报告，**总耗时 < 5 分钟**
 
 ---
 
 ### 创新点
 
-#### 1. **审核驱动的质量保证**
+#### 1. **动态记忆存储与人物画像复用**
+
+- **传统痛点**：每次调研生成新用户，调研完即销毁，无法沉淀用户资产
+- **EchoSim 解决方案**：
+  - 引入 **Agent F（Memory Manager）**，监听 `[PERSONA_BATCH_READY]` 消息
+  - 将每个生成的用户画像实时存入 **ChromaDB 向量数据库**（`store_persona_to_memory`）
+  - 实现人物画像的长期保存、结构化存储与元数据管理
+  - 为后续“相似画像召回”、“跨调研用户复用”打下基础
+
+#### 2. **审核驱动的质量保证**
 - 传统 AI 调研缺乏质量把控，易产生无效问卷
 - EchoSim 引入 **Agent E 审核员**，从方法论角度评估：
   - 是否存在引导性问题
@@ -235,14 +263,14 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
   - 是否适配目标受众
 - **防死锁机制**：最多 2 次修订，避免无限循环
 
-#### 2. **实时市场情报驱动**
+#### 3. **实时市场情报驱动**
 - 不依赖人工经验，**自动抓取实时数据**：
   - Google News：竞品发布、行业趋势
   - Reddit：真实用户痛点与抱怨
   - Hacker News：技术社区质疑与期待
 - 问卷设计基于**真实市场反馈**而非主观假设
 
-#### 3. **可扩展并发模拟引擎**
+#### 4. **可扩展并发模拟引擎**
 - 传统方案：逐个调用 LLM（样本数 N 增大时，总耗时近似线性增长）
 - EchoSim 方案：
   - 使用 `asyncio` + `httpx.AsyncClient` 实现批量异步并发调用（`create_task` + `gather`）
@@ -253,12 +281,12 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
 - **性能收益**：在并发度为 `k` 时，整体耗时可从串行的 O(N) 缩短到接近 O(N/k) 的量级（受模型延迟与限流影响）
 
 
-#### 4. **任务版本追踪系统**
+#### 5. **任务版本追踪系统**
 - 每个调研任务分配唯一 `task_id`（如：`survey_20260115_102030`）
 - `revision` 字段追踪修订历史（0 → 1 → 2）
 - 端到端可追溯：从问卷设计到最终报告
 
-#### 5. **频道化隔离与协议严格化**
+#### 6. **频道化隔离与协议严格化**
 - 传统多 Agent 系统易产生"串话"问题
 - EchoSim 通过：
   - **频道隔离**：4 个专用频道各司其职
@@ -291,6 +319,13 @@ EchoSim 采用 **4 个专用频道** 隔离不同阶段的工作流：
 | 📱 **真实用户调研** | ⭐⭐ | 不可替代真实用户，但可作为补充 |
 
 ### 可扩展性
+
+#### 记忆系统扩展（Agent F 已实现存储，待扩展召回）
+
+- 🔍 **相似画像召回**：基于语义搜索（已集成 `retrieve_similar_personas` 工具）
+- 🔄 **跨调研用户复用**：唤醒历史画像参与新调研
+- 📈 **用户演进追踪**：更新 `update_history` 记录参与轨迹
+- 🧠 **个性化响应建模**：基于历史回答调整模拟策略
 
 #### 横向扩展（数据源）
 - 🔌 **App Store / Google Play 评论**：接入应用商店爬虫
@@ -379,14 +414,21 @@ export OPENAI_BASE_URL="https://api.minimax.chat/v1"
 export DEFAULT_LLM_MODEL_NAME="gpt-4o-mini"
 ```
 
-#### 4️⃣ 启动 Agent Network
+#### 4️⃣ 启动 Agent Network &&  Agent（open 7 terminal）
 
 ```bash
 cd openagents/EchoSim
 openagents-cli network start
+openagents agent start ./EchoSim/agents/Agent_A_SurveyArchitect.yaml
+openagents agent start ./EchoSim/agents/Agent_B_generator.yaml
+openagents agent start ./EchoSim/agents/Agent_C_Simulator.yaml
+openagents agent start ./EchoSim/agents/Agent_D_Analyst.yaml
+openagents agent start ./EchoSim/agents/Agent_F_Memory.yaml
+openagents agent start ./EchoSim/agents/Agent_E_SurveyAuditor.yaml
 ```
 
 **预期输出**：
+
 ```
 [INFO] Loading network configuration from network.yaml
 [INFO] Starting gRPC transport on port 8600
@@ -394,6 +436,10 @@ openagents-cli network start
 [INFO] Studio UI available at http://localhost:8700/studio
 [INFO] Network MultiAgentChatroom (chatroom-1) started successfully
 ```
+
+
+
+
 
 #### 5️⃣ 访问 Studio UI
 
@@ -547,7 +593,7 @@ export DEFAULT_LLM_MODEL_NAME="claude-3-opus-20240229"
 - 检查 `network.yaml` 中 `serve_studio: true`
 - 尝试使用 `http://127.0.0.1:8700/studio`
 
---- 
+---
 
 ## 📁 项目结构
 
@@ -574,7 +620,8 @@ EchoSim/
 │       │   ├── Agent_E_SurveyAuditor.yaml     # 问卷审核员（质量保证）
 │       │   ├── Agent_B_generator.yaml         # 画像生成工厂
 │       │   ├── Agent_C_Simulator.yaml         # 虚拟受访者（并发池）
-│       │   └── Agent_D_Analyst.yaml           # 洞察分析师
+│       │   ├── Agent_D_Analyst.yaml           # 洞察分析师
+│				│		└── Agent_F_Memory.yaml            # 记忆管理器（向量存储）
 │       │
 │       ├── config/                    # 配置文件目录
 │       ├── mods/                      # 自定义 Mod 目录（如有）
@@ -587,7 +634,7 @@ EchoSim/
 
 ---
 ## 🤝 团队与分工
-#### ZilongXiao-00@xiaozl_00@foxmail.com
+#### ZilongXiao-00 @ xiaozl_00@foxmail.com
 
 **个人介绍**：
 测试开发工程师，AI 爱好者。擅长挖掘前沿技术落地场景，专注于多智能体协作（Multi-Agent Systems）与自动化流程重构。
@@ -609,7 +656,7 @@ EchoSim/
 
 3. 技术路线与升级方案：规划了项目的演进蓝图，包括纵向的专业调研方法论集成（如 MaxDiff、Conjoint）以及横向的多源数据接入。
 
-#### Yecheng@u.nus.edu / Scofieldj213@gmail.com
+#### YechengJiao @ Yecheng@u.nus.edu｜Scofield213@gmail.com
 
 **个人介绍**：  
 新加坡国立大学（NUS）机械工程博士研究生，研究方向聚焦于**多加工机器人协作**与**能耗预测与优化**。同时关注多智能体协作（Multi-Agent Systems）在复杂工程系统中的应用，致力于将智能算法与真实制造场景深度融合。
@@ -635,6 +682,31 @@ EchoSim/
   
 3. 技术路线与升级方案：  
    在原有演进蓝图基础上，补充了**审核驱动流程设计**与**工业级并发模拟能力**两条核心技术主线。
+   
+#### Pangpang526 @ wpengyu05@gmail.com
+   
+   **个人介绍**：  
+   AI 大模型工程师，专注于多智能体系统、模型高质量数据集微调处理与企业级RAG应用。擅长将前沿 AI 技术转化为可落地的产品化解决方案。
+   
+   **项目贡献**：
+   
+   1. **Agent B（Persona Factory）优化与扩展**：
+      - 重构了 Agent B 的触发逻辑，确保其**仅监听 `[SURVEY_APPROVED]` 消息**，避免对未审核问卷产生响应。
+      - 将画像生成规模从固定 2 个扩展为**动态可配置（10-20 个）**，支持更丰富的用户群体模拟。
+      - 优化了画像生成提示词，确保输出结构标准化、字段完整（id, name, age, role, traits, context）。
+   
+   2. **Agent F（Memory Manager）设计与实现**：
+      - **问题识别**：解决了传统调研中“用户画像零沉淀、无法复用”的痛点。
+      - **解决方案**：设计了基于向量数据库的长期记忆存储系统，监听 `[PERSONA_BATCH_READY]` 消息，自动将生成的用户画像存入 **ChromaDB**。
+      - **核心功能**：
+        - 实时存储：调用 `store_persona_to_memory` 将画像结构化存储至向量库（`openagents/local_vector_db/persona_db/chroma.sqlite3`）
+        - 确认机制：发布 `[MEMORY_STORED]` 消息，确保存储状态可追溯
+        - 工具集成：实现了 `retrieve_similar_personas` 与 `update_persona_history` 工具，支持后续召回与历史更新
+      - **创新价值**：首次在自动化调研框架中引入**动态记忆存储**，为后续“跨调研用户复用”、“相似画像召回”打下基础，实现用户资产的长期沉淀。
+   
+   3. **技术债务清理与架构优化**：
+      - 统一了 Agent 间的协议消息格式，确保 `[PERSONA_BATCH_READY]` 和 `[MEMORY_STORED]` 的标准化输出。
+      - 增强了系统的可扩展性，为未来“个性化响应建模”、“用户演进追踪”提供了数据基础。
 ---
 
 ## 🚀 遇到的挑战与解决方案
@@ -645,7 +717,7 @@ EchoSim/
 早期多 Agent 在 `react_to_all_messages: true` 的条件下，可能对非职责频道消息产生响应（跨频道“串话”），引发误触发、重复输出与流程污染。
 
 - **解决方案**：  
-通过“协议前缀 + 频道护栏 + 幂等去重”三层治理，系统性消除插嘴：
+  通过“协议前缀 + 频道护栏 + 幂等去重”三层治理，系统性消除插嘴：
 
   1) **协议前缀触发**：所有关键阶段仅响应指定前缀（如 `[SURVEY_TASK_INIT]` / `[PERSONA_BATCH_READY]` / `[SIMULATION_COMPLETE]`），其余消息静默忽略。  
   2) **Channel Guard**：在每个 Agent 指令中加入硬性频道校验，只允许从指定频道触发；非目标频道事件一律 `silent ignore`。  
@@ -664,7 +736,6 @@ EchoSim/
 
 - **问题阐述**：  
 Agent C 早期采用串行逐个 persona 调用 LLM，样本数增大后总耗时线性增长，难以满足实际调研场景的规模需求。
-
 - **解决方案**：  
 引入 `sim_worker_pool` 并封装为自定义工具 `simulate_survey_batch`，将 persona 填答改为**批量并行模拟**，通过 `max_concurrency` 控制并发上限以兼顾吞吐与限流稳定性。  
 效果：在相同模型与问题规模下，整体耗时显著下降，使得 50/100+ personas 的模拟具备实际可用性。
@@ -720,7 +791,7 @@ SOFTWARE.
 
 ## 📧 联系方式
 
-- **项目维护者**：ZilongXiao-00, Yecheng Jiao
+- **项目维护者**：ZilongXiao-00, Yecheng Jiao,pangpang526
 - **GitHub**：https://github.com/ZilongXiao-00/EchoSim
 - **问题反馈**：通过 GitHub Issues 提交
 
@@ -729,7 +800,7 @@ SOFTWARE.
 ## 🌟 致谢
 
 - [OpenAgents](https://github.com/aitomatic/openagents) - 多智能体编排框架
-- 所有贡献者 @YechengJiao @pangpang526
+- 所有贡献者 @ZilongXiao-00 @YechengJiao @pangpang526
 
 ---
 
