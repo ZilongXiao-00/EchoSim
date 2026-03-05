@@ -1,5 +1,12 @@
 # EchoSim
 
+## 视频演示
+
+| 平台 | 链接 |
+|------|------|
+| B站 | [EchoSim 功能演示](https://www.bilibili.com/video/BV1KakFBSE5P/) |
+| YouTube | [EchoSim Demo](https://youtu.be/GMoQi9y_ceI) |
+
 <div align="center">
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
